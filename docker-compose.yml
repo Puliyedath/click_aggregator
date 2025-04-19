@@ -7,8 +7,31 @@ services:
     environment:
       - REDIS_HOST=redis_counter_db
       - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis}
+      - PORT=${PORT:-8000}
     ports:
       - "${PORT:-8000}:8000"
+    volumes:
+      - ./app:/fastapi-app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      - redis_counter_db
+    networks:
+      - fastapi-app-network
+  
+
+  fastapi-app-counter-updates:
+    container_name: fastapi-app-counter-updates
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=redis_counter_db
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis}
+      - PORT=${PORT:-9000}
+    ports:
+      - "${PORT:-9000}:8000"
     volumes:
       - ./app:/fastapi-app/app
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -20,6 +43,10 @@ services:
   redis_counter_db:
     container_name: redis_counter_db
     image: redis:latest
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis}
+      - REDIS_HOST=${REDIS_HOST:-redis_counter_db}
+      - REDIS_PORT=${REDIS_PORT:-6379}
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -30,6 +57,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis}
     networks:
       - fastapi-app-network
 
