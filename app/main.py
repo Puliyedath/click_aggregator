@@ -9,6 +9,7 @@ from app.redis_counter_client import CounterRedisClient
 import os
 import signal
 import sys
+import asyncio
 from contextlib import asynccontextmanager
 
 from app.redis_message_channel_client import RedisMessageChannelClient
@@ -95,19 +96,40 @@ async def sse_counter(request: Request):
             chat_room_ids
         )
 
-        async def event_stream():
+        queue = asyncio.Queue()
+
+        async def redis_listener():
             try:
                 async for message in pubsub.listen():
                     print("Redis message received: >>> ", message)
                     if message["type"] == "message":
-                        yield f"data: {message['data'].decode()}\n\n"
+                        await queue.put(message["data"])
                     if await request.is_disconnected():
                         print("Client disconnected")
                         break
-            except Exception as e:
-                print(f"Error in event stream: {e}")
+            except asyncio.CancelledError:
+                print("Event stream cancelled")
             finally:
                 await pubsub.close()
+
+        listener_task = asyncio.create_task(redis_listener())
+
+        async def event_stream():
+            try:
+                while not await request.is_disconnected():
+                    try:
+                        message = await asyncio.wait_for(queue.get(), timeout=1)
+                        decoded_message = (
+                            message.decode()
+                            if isinstance(message, bytes)
+                            else str(message)
+                        )
+                        yield f"data: {decoded_message}\n\n"
+                    except asyncio.TimeoutError:
+                        continue
+            finally:
+                listener_task.cancel()
+                await listener_task
 
         return StreamingResponse(
             event_stream(),
