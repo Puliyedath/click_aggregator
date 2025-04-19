@@ -1,0 +1,38 @@
+services:
+  fastapi-app:
+    container_name: fastapi-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=redis_counter_db
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - ./app:/fastapi-app/app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      - redis_counter_db
+    networks:
+      - fastapi-app-network
+
+  redis_counter_db:
+    container_name: redis_counter_db
+    image: redis:latest
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-h", "0.0.0.0", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - fastapi-app-network
+
+networks:
+  fastapi-app-network:
+    driver: bridge
