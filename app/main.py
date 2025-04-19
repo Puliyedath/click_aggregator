@@ -58,7 +58,8 @@ async def send_message(request: Request):
     chat_room_id = data.get("chat_room_id")
     assert message is not None, "Message is required"
     assert chat_room_id is not None, "Chat room ID is required"
-    await redis_message_channel_client.publish_message(message, chat_room_id)
+    message_dict = {"message": message, "chat_room_id": chat_room_id}
+    await redis_message_channel_client.publish_message(message_dict, chat_room_id)
     return {"status": "success", "message": "Message sent successfully"}
 
 

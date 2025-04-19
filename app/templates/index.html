@@ -13,29 +13,53 @@
                 const messageForm = document.getElementById("message-form");
                 const messageInput = document.getElementById("message-input");
                 const chatMessages = document.getElementById("chat-messages");
+                const chatMessagesList = document.getElementById("chat-messages-list");
                 const startPolling = document.getElementById("start-polling");
+                const messages = []
+
+
 
                 startPolling.addEventListener("submit", async (e) => {
                     e.preventDefault();
                     const data = new FormData(e.target);
                     const userId = data.get("user_id");
+                    const controller = new AbortController();
                     const response = await fetch("/sse", {
                         method: "POST",
                         headers: {
                             "user_id": userId
-                        }
+                        },
+                        signal: controller.signal
                     });
+                    
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
                     while (true) {
-                        console.log("reading the response");
                         const { done, value } = await reader.read();
-                        console.log({ done, value });
                         if (done) break;
                         const message = decoder.decode(value);
-                        console.log("Received message:", message);
+                        if (message) {
+                            const messageParts = message.split('\n\n');
+                            // this is what the original message looks like:
+                            // 'data: {"message": "this is me 2", "chat_room_id": "chat_room_4"}\n\n'
+                            messageParts.pop();
+                            const jsonMessage = messageParts.join('').replace("data: ", "");
+                            const msg = JSON.parse(jsonMessage);
+                            console.log("Received message:", msg);
+                            const messageElement = document.createElement("li");
+                            messageElement.classList.add("list-group-item");
+                            messageElement.textContent = msg.message;
+                            chatMessagesList.appendChild(messageElement);
+                        }
                     }
-                        
+                    window.addEventListener("beforeunload", () => {
+                        if (controller) {
+                            controller.abort();
+                        }
+                        if (reader) {
+                            reader.cancel();
+                        }
+                    });
                 });
 
                 messageForm.addEventListener("submit", async (e) => {
@@ -71,7 +95,7 @@
                         <div class="card-body">
                             <h5 class="card-title">Chat</h5>
                             <div id="chat-messages" class="list-group vh-70 overflow-auto">
-                                
+                                <ul id="chat-messages-list"></ul>
                             </div>
                             <form id="message-form">
                                 <div class="input-group">

@@ -1,5 +1,6 @@
 import redis.asyncio as redis
 import os
+import json
 
 
 class RedisMessageChannelClient:
@@ -12,8 +13,8 @@ class RedisMessageChannelClient:
         )
         self.pubsub = None
 
-    async def publish_message(self, message: str, chat_room_id: str):
-        await self.redis_client.publish(chat_room_id, message)
+    async def publish_message(self, message: dict, chat_room_id: str):
+        await self.redis_client.publish(chat_room_id, json.dumps(message))
 
     async def subscribe_to_chat_room(self, chat_room_ids: list[str]):
         pubsub = self.redis_client.pubsub()
