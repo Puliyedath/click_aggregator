@@ -1,15 +1,25 @@
 import time
 from typing import Union
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from app.redis_client import CounterRedisClient
+from app import redis_message_channel_client
+from app.redis_counter_client import CounterRedisClient
 import os
 import signal
 import sys
 from contextlib import asynccontextmanager
 
+from app.redis_message_channel_client import RedisMessageChannelClient
+
 fastapi_counter = CounterRedisClient(
+    host=os.getenv("REDIS_HOST"),
+    port=int(os.getenv("REDIS_PORT")),
+    password=os.getenv("REDIS_PASSWORD"),
+)
+
+redis_message_channel_client = RedisMessageChannelClient(
     host=os.getenv("REDIS_HOST"),
     port=int(os.getenv("REDIS_PORT")),
     password=os.getenv("REDIS_PASSWORD"),
@@ -32,10 +42,24 @@ class Counter(BaseModel):
 
 counter = Counter(count=0)
 
+templates = Jinja2Templates(directory="app/templates")
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello Counter app"}
+
+@app.get("/", response_class=HTMLResponse)
+def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.post("/send-message")
+async def send_message(request: Request):
+    payload = await request.json()
+    data = payload.get("data")
+    message = data.get("message")
+    chat_room_id = data.get("chat_room_id")
+    assert message is not None, "Message is required"
+    assert chat_room_id is not None, "Chat room ID is required"
+    await redis_message_channel_client.publish_message(message, chat_room_id)
+    return {"status": "success", "message": "Message sent successfully"}
 
 
 @app.get("/counter/{count}")
@@ -53,8 +77,42 @@ async def update_counter() -> Counter:
     return Counter(count=newCount)
 
 
-@app.get("/sse")
+user_chat_room = {
+    "user_1": ["chat_room_1", "chat_room_2"],
+    "user_2": ["chat_room_3", "chat_room_4"],
+}
+
+
+@app.post("/sse/")
 async def sse_counter(request: Request):
-    return StreamingResponse(
-        fastapi_counter.async_counter_reader(request), media_type="text/event-stream"
-    )
+    try:
+        user_id = request.headers.get("user_id")
+        assert user_id is not None, "User ID is required"
+        chat_room_ids = user_chat_room[user_id]
+        assert chat_room_ids is not None, "Chat room IDs are required"
+        pubsub = await redis_message_channel_client.subscribe_to_chat_room(
+            chat_room_ids
+        )
+
+        async def event_stream():
+            try:
+                async for message in pubsub.listen():
+                    print("Redis message received: >>> ", message)
+                    if message["type"] == "message":
+                        yield f"data: {message['data'].decode()}\n\n"
+                    if await request.is_disconnected():
+                        print("Client disconnected")
+                        break
+            except Exception as e:
+                print(f"Error in event stream: {e}")
+            finally:
+                await pubsub.close()
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache"},
+        )
+    except Exception as e:
+        print(f"Error in SSE counter: {e}")
+        raise
