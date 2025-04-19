@@ -1,21 +1,21 @@
-# FastAPI Counter App
+# 🚀 FastAPI Counter App
 
 A simple FastAPI application that implements a counter with basic CRUD operations.
 
-## Features
+## ✨ Features
 
-- Simple counter implementation
-- RESTful API endpoints
-- Docker containerization
+- 🔢 Simple counter implementation
+- 🔄 RESTful API endpoints
+- 🐳 Docker containerization
 
-## API Endpoints
+## 🔌 API Endpoints
 
 - `GET /`: Returns a welcome message
 - `GET /counter`: Returns the current counter value
 - `PUT /counter`: Increments the counter by 1 and returns the new value
 
 
-### Development
+### 🛠️ Development
 
 1. Build the Docker stack:
    ```bash
@@ -29,19 +29,19 @@ A simple FastAPI application that implements a counter with basic CRUD operation
 
 The application will be available at `http://localhost:8000`
 
-## API Documentation
+## 📚 API Documentation
 
 Once the application is running, you can access:
-- Swagger UI documentation at `http://localhost:8000/docs`
-- ReDoc documentation at `http://localhost:8000/redoc`
+- 📝 Swagger UI documentation at `http://localhost:8000/docs`
+- 📖 ReDoc documentation at `http://localhost:8000/redoc`
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 .
-├── app/
-│   └── main.py
-├── Dockerfile
-├── requirements.txt
-└── README.md
+├── 📂 app/
+│   └── 📄 main.py
+├── 📄 Dockerfile
+├── 📄 requirements.txt
+└── 📄 README.md
 ```
